@@ -20,17 +20,19 @@ end entity SBOX;
 architecture SBOX_ARCH of SBOX is
     constant TABLE_SIZE  : INTEGER := 2 ** WIDTH;
     type LOOKUPTABLE is array(0 to (TABLE_SIZE - 1 )) of std_logic_vector((WIDTH - 1) downto 0);
-    signal COUNTER: INTEGER;
+    signal COUNTER: INTEGER RANGE 0 TO (TABLE_SIZE-1);
 begin
     process(CLK)
     variable TABLE: LOOKUPTABLE;
     begin
         if CLK = '1' and CLK'event then
             if RESET = '1' then
+                OUTPUT <= ( others => 'X' );
                 COUNTER <= 0;
             elsif SET = '0' then
                OUTPUT <= TABLE(to_integer(unsigned(INPUT)));
             else
+                OUTPUT <= ( others => 'X' );
                 TABLE(COUNTER) := INPUT;
                 COUNTER <= (COUNTER + 1) mod TABLE_SIZE;
             end if;

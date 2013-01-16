@@ -2,41 +2,47 @@ library     ieee;
 use         ieee.std_logic_1164.all;
 use         ieee.numeric_std.all;
 
-entity SBOX is
+entity Sbox is
     generic (
-        WIDTH : INTEGER := 2
+        WIDTH : INTEGER := 8
     );
     port (
-        RESET: in std_logic;
-        SET: in std_logic;
-        CLK: in std_logic;
+        reset: in std_logic;
+        set: in std_logic;
+        clk: in std_logic;
 
-
-        INPUT: in std_logic_vector((WIDTH - 1) downto 0);
-        OUTPUT: out std_logic_vector((WIDTH - 1) downto 0)
+        input: in std_logic_vector((WIDTH - 1) downto 0);
+        output: out std_logic_vector((WIDTH - 1) downto 0)
     );
-end entity SBOX;
+end entity Sbox;
 
-architecture SBOX_ARCH of SBOX is
-    constant TABLE_SIZE  : INTEGER := 2 ** WIDTH;
-    type LOOKUPTABLE is array(0 to (TABLE_SIZE - 1 )) of std_logic_vector((WIDTH - 1) downto 0);
-    signal COUNTER: INTEGER RANGE 0 TO (TABLE_SIZE-1);
+architecture SboxArch of Sbox is
+    constant TABLE_SIZE  : integer := 2 ** WIDTH;
+    type lookuptable is array(0 to (TABLE_SIZE - 1 )) of std_logic_vector((WIDTH - 1) downto 0);
+    signal counter: integer range 0 to (TABLE_SIZE - 1);
 begin
-    process(CLK)
-    variable TABLE: LOOKUPTABLE;
+    process(clk)
+      variable table: lookuptable;
     begin
-        if CLK = '1' and CLK'event then
-            if RESET = '1' then
-                OUTPUT <= ( others => 'X' );
-                COUNTER <= 0;
-            elsif SET = '0' then
-               OUTPUT <= TABLE(to_integer(unsigned(INPUT)));
-            else
-                OUTPUT <= ( others => 'X' );
-                TABLE(COUNTER) := INPUT;
-                COUNTER <= (COUNTER + 1) mod TABLE_SIZE;
-            end if;
+
+      -- default values
+      counter <= 'X';
+      output <= ( others => 'X' ); 
+        
+      if clk = '1' and clk'event then
+
+        if reset = '1' then
+          counter <= 0;
+          
+        elsif set = '1' then
+          table(counter) := input;
+          counter <= (counter + 1) mod TABLE_SIZE;
+          
+        else -- set should be 1
+          output <= table(to_integer(unsigned(input)));
+
         end if;
+      end if;
     end process;
-end architecture SBOX_ARCH;
+end architecture SboxArch;
 

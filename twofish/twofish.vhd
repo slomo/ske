@@ -95,10 +95,10 @@ package body twofish is
   --
   -- perform  either a q0 or q1 permutaion (see [1] 4.5.3 )  
   function qperm ( input: unsigned( SBOX_WIDTH-1 downto 0); 
-                   conf: integer range 0 to 1 ) 
+                   qId: integer range 0 to 1 ) 
     return unsigned( SBOX_WIDTH-1 downto 0) is
     
-    variable a0,b0, a1,b1 :  unsigned( SBOX_WIDTH/2-1 downto 0);
+    variable a0, b0, a1, b1 :  unsigned( SBOX_WIDTH/2-1 downto 0);
     
   begin
     
@@ -110,8 +110,8 @@ package body twofish is
       a1 := a0 xor b0;
       b1 := a0 xor shift_right(b0, 1) xor ( a0(0) & '0' & '0' & '0');
       
-      a0 := q(conf)(2*i)(to_integer(a1));
-      b0 := q(conf)(2*i+1)(to_integer(b1));
+      a0 := q(qId)(2*i)(to_integer(a1));
+      b0 := q(qId)(2*i+1)(to_integer(b1));
     end loop l1;
     
     return (a0 & b0);
@@ -139,8 +139,7 @@ package body twofish is
   --
   -- Compute the inner Function g based directly on the Q-pertmutation. This
   -- Function is compatible to h (see [2] fig 2)
-  function g ( input, s0, s1: unsigned( FUNC_WIDTH-1 downto 0);
-               conf: confT )
+  function g ( input, s0, s1: unsigned( FUNC_WIDTH-1 downto 0))
     return unsigned( FUNC_WIDTH-1 downto 0) is
 
     variable intern : unsigned( FUNC_WIDTH-1 downto 0);
@@ -155,7 +154,7 @@ package body twofish is
       for j in 0 to 3 loop
 
         intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j) :=
-          qperm( intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j), conf(j)(i));
+          qperm( intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j), QPERM_CONF(j)(i));
 
       end loop;
       intern := intern xor s(i); 
@@ -163,7 +162,7 @@ package body twofish is
 
     -- apply last columns of sbox
     for j in 0 to 3 loop 
-      mdsVec(j) :=  qperm(intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j), conf(i)(2));
+      mdsVec(j) :=  qperm(intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j), QPERM_CONF(i)(2));
     end loop;
     
     mdsVec := mds(mdsVec);        
@@ -193,7 +192,7 @@ package body twofish is
     
     for i in 0 to 2 loop 
 
-      intern := qperm( intern, QPERM_CONF( i ) );
+      intern := qperm( intern, QPERM_CONF(id)(i) );
 
       if i /= 2 then 
         intern := s(i) xor intern;
@@ -209,8 +208,7 @@ package body twofish is
   --
   -- Implements function h by using the sboxes defined before. This is a direct
   -- replacment for function g (see [2] fig 2)
-  function h ( input, s0, s1: unsigned( FUNC_WIDTH-1 downto 0);
-               conf: confT )
+  function h ( input, s0, s1: unsigned( FUNC_WIDTH-1 downto 0))
     return unsigned( FUNC_WIDTH-1 downto 0) is
 
     variable intern: vectorT;
@@ -222,7 +220,7 @@ package body twofish is
         input(SBOX_WIDTH*(i-1)-1 downto SBOX_WIDTH*i),
         s0(SBOX_WIDTH*(i-1)-1 downto SBOX_WIDTH*i),
         s1(SBOX_WIDTH*(i-1)-1 downto SBOX_WIDTH*i),
-        conf(i));
+        QPERM_CONF(i));
       
     end loop;
 

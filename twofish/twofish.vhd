@@ -297,7 +297,7 @@ package body twofish is
       tmpBlock(i) := g(tmpBlock(i), s(0), s(1));
     end loop;
 
-    ( tmpBlock(0), tmpBlock(1)) := pht( (tmpBlock(0), tmpBlock(1)) );
+    ( tmpBlock(0), tmpBlock(1) ) := pht( (tmpBlock(0), tmpBlock(1)) );
 
     for i in 0 to 1 loop
       tmpBlock(i) := tmpBlock(i) xor roundKey(i);

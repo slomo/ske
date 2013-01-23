@@ -33,7 +33,7 @@ use twofish.ALL;
 --library UNISIM;
 --use UNISIM.VComponents.all;
 
-entity RoundWrappper is
+entity RoundWrapper is
     port (
         clkb : IN STD_LOGIC;
         web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
@@ -50,9 +50,9 @@ entity RoundWrappper is
         clk : IN STD_LOGIC
         );
         
-end RoundWrappper;
+end RoundWrapper;
 
-architecture RoundWrapperArch of RoundWrappper is
+architecture RoundWrapperArch of RoundWrapper is
 
     component blockram
         port (

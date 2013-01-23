@@ -101,6 +101,11 @@ package twofish is
 
   function h ( input, s0, s1: unsigned( FUNC_WIDTH-1 downto 0))
     return unsigned;
+    
+  function round ( inBlock : blockT;
+                   rNo : integer range 0 to 15;
+                   m0, me, s : halfBlockT )
+    return blockT;
 
 end twofish;
 
@@ -123,7 +128,7 @@ package body twofish is
     
     l1: for i in 0 to 1 loop
       a1 := a0 xor b0;
-      b1 := a0 xor shift_right(b0, 1) xor ( a0(0) & '0' & '0' & '0');
+      b1 := a0 xor (b0 ror 1) xor ( a0(0) & '0' & '0' & '0');
       
       a0 := q(qId)(2*i)(to_integer(a1));
       b0 := q(qId)(2*i+1)(to_integer(b1));
@@ -168,8 +173,8 @@ package body twofish is
     for i in 0 to 1 loop 
       for j in 0 to 3 loop
 
-        intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j) :=
-          qperm( intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j), QPERM_CONF(j)(i));
+        intern(SBOX_WIDTH*(j+1)-1 downto SBOX_WIDTH*j) :=
+          qperm( intern(SBOX_WIDTH*(j+1)-1 downto SBOX_WIDTH*j), QPERM_CONF(j)(i));
 
       end loop;
       intern := intern xor s(i); 
@@ -177,13 +182,13 @@ package body twofish is
 
     -- apply last columns of sbox
     for j in 0 to 3 loop 
-      mdsVec(j) :=  qperm(intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j), QPERM_CONF(j)(2));
+      mdsVec(j+1) :=  qperm(intern(SBOX_WIDTH*(j+1)-1 downto SBOX_WIDTH*j), QPERM_CONF(j)(2));
     end loop;
     
     mdsVec := mds(mdsVec);        
 
     for j in 0 to 3 loop 
-      intern(SBOX_WIDTH*(j-1)-1 downto SBOX_WIDTH*j) := mdsVec(j); 
+      intern(SBOX_WIDTH*(j+1)-1 downto SBOX_WIDTH*j) := mdsVec(j+1); 
     end loop;
 
     return intern;
@@ -199,10 +204,9 @@ package body twofish is
     return unsigned is
 
     type sT is array ( 0 to 1 ) of unsigned( SBOX_WIDTH-1 downto 0);
-    variable s: sT := ( s0, s1 );
+    variable s: sT := (s0, s1);
     variable intern : unsigned( SBOX_WIDTH-1 downto 0);
   begin
-
     intern := input;
     
     for i in 0 to 2 loop 
@@ -231,10 +235,10 @@ package body twofish is
     
     for i in 0 to 3 loop 
 
-      intern(i) :=  sbox(
-        input(SBOX_WIDTH*(i-1)-1 downto SBOX_WIDTH*i),
-        s0(SBOX_WIDTH*(i-1)-1 downto SBOX_WIDTH*i),
-        s1(SBOX_WIDTH*(i-1)-1 downto SBOX_WIDTH*i),
+      intern(i+1) :=  sbox(
+        input(SBOX_WIDTH*(i+1)-1 downto SBOX_WIDTH*i),
+        s0(SBOX_WIDTH*(i+1)-1 downto SBOX_WIDTH*i),
+        s1(SBOX_WIDTH*(i+1)-1 downto SBOX_WIDTH*i),
         i);
       
     end loop;
@@ -277,21 +281,21 @@ package body twofish is
       keySeed := to_unsigned(2 * rNo + i, SBOX_WIDTH);
 
       for j in 0 to 3 loop
-        roundKey(i) ( keySeed'length*j - 1 downto
-                      keySeed'length*(j-1) ) := keySeed;
+        roundKey(i) ( keySeed'length*(j+1) - 1 downto
+                      keySeed'length*j ) := keySeed;
       end loop;
     end loop;
 
     
     roundKey(0) := h(roundKey(0), m0(0), m0(1));
-    roundKey(1) := shift_left(h(roundKey(1), me(0), me(1)), 8);
+    roundKey(1) := h(roundKey(1), me(0), me(1)) rol 8;
 
     roundKey := pht(roundKey);
-    roundKey(1) := shift_left(roundKey(1), 9);  
+    roundKey(1) := roundKey(1) rol 9;  
 
     
     -- compute rest of f
-    tmpBlock(1) := shift_left(tmpBlock(1), 8);
+    tmpBlock(1) := tmpBlock(1) rol 8;
 
     for i in 0 to 1 loop
       tmpBlock(i) := g(tmpBlock(i), s(0), s(1));
@@ -305,13 +309,13 @@ package body twofish is
 
     -- perform round related stuff
 
-    tmpBlock(3) := shift_left(tmpBlock(3), 1);
+    tmpBlock(3) := tmpBlock(3) rol 1;
 
     for i in 2 to 3 loop
       tmpBlock(i) := tmpBlock(i) xor tmpBlock(i-2);
     end loop;
 
-    tmpBlock(2) := shift_right(tmpBlock(2), 1);
+    tmpBlock(2) := tmpBlock(2) ror 1;
     
     return tmpBlock;
   end function round;

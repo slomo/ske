@@ -36,8 +36,10 @@ use twofish.ALL;
 entity RoundWrapper is
     port (
         clkb : IN STD_LOGIC;
-        web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
-        addrb : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
+        rstb : IN STD_LOGIC;
+        enb : IN STD_LOGIC;
+        web : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
+        addrb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
         dinb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
         doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
         
@@ -62,6 +64,8 @@ architecture RoundWrapperArch of RoundWrapper is
             dina : IN STD_LOGIC_VECTOR(127 DOWNTO 0);
             douta : OUT STD_LOGIC_VECTOR(127 DOWNTO 0);
             clkb : IN STD_LOGIC;
+            rstb : IN STD_LOGIC;
+            enb : IN STD_LOGIC;
             web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
             addrb : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
             dinb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
@@ -80,11 +84,6 @@ architecture RoundWrapperArch of RoundWrapper is
     signal state : stateT := idle;
     signal nextState : stateT := idle;
     
-    -- keys
-    signal m0 : halfBlockT;
-    signal me : halfBlockT;
-    signal s : halfBlockT;
-
 begin
 
     mlb : blockram
@@ -103,8 +102,10 @@ begin
             douta (127 downto 96) => blockIn(3),
             
             clkb => clkb,
-            web => web,
-            addrb => addrb,
+            web => web(0 downto 0),
+            rstb => rstb,
+            enb => enb,
+            addrb => addrb(6 downto 0),
             dinb => dinb,
             doutb => doutb
             );
@@ -113,7 +114,6 @@ begin
     begin
         if reset = '1' then
             state <= idle;
-            adress <= "00000";
         elsif clk = '1' and clk'event then
             state <= nextState;
             adress <= nextAdress;
@@ -149,26 +149,29 @@ begin
     
     outlogic: process(state, blockIn)
         variable tmp : blockT;
+        -- keys
+        variable m0 : halfBlockT;
+        variable me : halfBlockT;
+        variable s : halfBlockT;
     begin
-        nextAdress <= adress;
+        nextAdress <= "00000";
         writeEnable(0) <= '0';
         done <= '0';
+        blockOut <= ( others => (others => '0') );
         
         case state is
             when idle =>
-                nextAdress <=  "00000";
                 done <= '1';
             when waitForM =>
                 nextAdress <= "00001";
             when waitForS =>
-                m0(0) <= unsigned(blockIn(0));
-                m0(1) <= unsigned(blockIn(1));
-                me(0) <= unsigned(blockIn(2));
-                me(1) <= unsigned(blockIn(3));
-                nextAdress <= "00000";
+                m0(0) := unsigned(blockIn(0));
+                m0(1) := unsigned(blockIn(1));
+                me(0) := unsigned(blockIn(2));
+                me(1) := unsigned(blockIn(3));
             when getS =>
-                s(0) <= unsigned(blockIn(0));
-                s(1) <= unsigned(blockIn(1));
+                s(0) := unsigned(blockIn(0));
+                s(1) := unsigned(blockIn(1));
             when ready =>
                 done <= '1';
             when waitForBlock =>

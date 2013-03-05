@@ -14,7 +14,7 @@
 -- IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 -- CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 --
--- Implemened after those papers (referenced in comments):
+-- Implemented after those two papers of Bruce Schneier (referenced in comments):
 --      [1] https://www.schneier.com/paper-twofish-paper.pdf
 --      [2] https://www.schneier.com/paper-twofish-fpga.pdf
 --
@@ -67,15 +67,15 @@ package twofish is
       
       )
     );
-	 
+  
   type rsRowT is array ( 0 to 7 ) of unsigned ( 7 downto 0 );
   type rsT is array ( 0 to 3 ) of rsRowT;
   constant RS_MATRIX : rsT := ( 
-	( x"01", x"A4", x"55", x"87", x"5A", x"58", x"DB", x"9E" ),
-	( x"A4", x"56", x"82", x"F3", x"1E", x"C6", x"68", x"E5" ),
-	( x"02", x"A1", x"FC", x"C1", x"47", x"AE", x"3D", x"19" ),
-	( x"A4", x"55", x"87", x"5A", x"58", x"DB", x"9E", x"03" )
-	);
+    ( x"01", x"A4", x"55", x"87", x"5A", x"58", x"DB", x"9E" ),
+    ( x"A4", x"56", x"82", x"F3", x"1E", x"C6", x"68", x"E5" ),
+    ( x"02", x"A1", x"FC", x"C1", x"47", x"AE", x"3D", x"19" ),
+    ( x"A4", x"55", x"87", x"5A", x"58", x"DB", x"9E", x"03" )
+    );
   
   constant MDS_MATRIX : matrixT := (
     ( x"01", x"EF", x"5B", x"5B" ),
@@ -110,12 +110,12 @@ package twofish is
 
   function h ( input, s0, s1: unsigned( FUNC_WIDTH-1 downto 0))
     return unsigned;
-    
+  
   function round ( inBlock : blockT;
                    rNo : integer range 0 to 15;
                    m0, me, s : halfBlockT )
     return blockT;
-	 
+  
   function crypt( key,data : blockT ) return blockT;
 
 end twofish;
@@ -258,7 +258,7 @@ package body twofish is
 
     return (
       intern(1) & intern(2) & intern(3) & intern(4)
-     );
+      );
 
   end function h;
 
@@ -272,10 +272,10 @@ package body twofish is
   end function pht;
   
   function generateRoundKey( keyNo: integer range 0 to 19;
-									  m0, me : halfBlockT)
-		return halfBlockT is
-	 variable keySeed : unsigned(SBOX_WIDTH - 1 downto 0);
-	 variable roundKey : halfBlockT;
+                             m0, me : halfBlockT)
+    return halfBlockT is
+    variable keySeed : unsigned(SBOX_WIDTH - 1 downto 0);
+    variable roundKey : halfBlockT;
   begin
     -- inital round keys generate round keys
     for i in 0 to 1 loop
@@ -293,8 +293,8 @@ package body twofish is
 
     roundKey := pht(roundKey);
     roundKey(1) := roundKey(1) rol 9;  
-	 
-	 return roundKey;
+    
+    return roundKey;
   end;
 
   -- round function
@@ -310,7 +310,7 @@ package body twofish is
   begin
     -- compute keys
     roundKey := generateRoundKey(rNo + 4, m0, me);
-   
+    
     -- compute rest of f
     tmpBlock(1) := tmpBlock(1) rol 8;
 
@@ -337,7 +337,7 @@ package body twofish is
     return tmpBlock;
   end function round;
 
-	type rsTmpType is array ( 0 to 3) of unsigned ( (SBOX_WIDTH-1) downto 0);
+  type rsTmpType is array ( 0 to 3) of unsigned ( (SBOX_WIDTH-1) downto 0);
 
   -- rs matrix multiplication
   function rs_multiply( vector: rsRowT) return unsigned is 
@@ -353,63 +353,65 @@ package body twofish is
   end function rs_multiply;
 
   function whitening ( data: blockT;
-							 m0, me: halfBlockT;
-							 offset: integer range 0 to 1 )
-		return blockT is
-	 variable tmp : blockT;
-	 variable whitening : halfBlockT;
+                       m0, me: halfBlockT;
+                       offset: integer range 0 to 1 )
+    return blockT is
+    variable tmp : blockT;
+    variable whitening : halfBlockT;
   begin
-  	for i in 0 to 1 loop
-	    whitening := generateRoundKey(2*offset+i, m0, me);
-		 
-		 for j in 0 to 1 loop
-		     tmp(2*i+j) := data(2*i+j) xor whitening(j);
-		 end loop;
-	end loop;
-	
-	return tmp;
+    for i in 0 to 1 loop
+      whitening := generateRoundKey(2*offset+i, m0, me);
+      
+      for j in 0 to 1 loop
+        tmp(2*i+j) := data(2*i+j) xor whitening(j);
+      end loop;
+    end loop;
+    
+    return tmp;
   end;
 
   function crypt( key,data : blockT ) return blockT is
 
-	variable me, m0, s, tmp : halfBlockT;
-	variable cryptData : blockT;
-   variable tmpRsRow : rsRowT;
+    variable me, m0, s, tmp : halfBlockT;
+    variable cryptData : blockT;
+    variable tmpRsRow : rsRowT;
   begin
-	
-	m0 := ( key(1), key(3));
-	me := ( key(0), key(2));
-	
-	for i in 0 to 1 loop
-	  tmpRsRow := (
-						key(i*2)(31 downto 24),
-						key(i*2)(23 downto 16),
-						key(i*2)(15 downto 8),
-						key(i*2)(7 downto 0),
-						key(i*2+1)(31 downto 24),
-						key(i*2+1)(23 downto 16),
-						key(i*2+1)(15 downto 8),
-						key(i*2+1)(7 downto 0));
-  	  s(i) := rs_multiply(tmpRsRow);
-	end loop;
-	
-	cryptData := whitening(data, m0, me, 0);
-	
-	for i in 0 to 15 loop
-		
-		cryptData := round(cryptData, i, m0, me, s);
-		tmp := ( cryptData(0), cryptData(1) );
-		
-		if i /= 16 then
-			cryptData(0) := cryptData(2);
-			cryptData(1) := cryptData(3);
-			cryptData(2) := tmp(0);
-			cryptData(3) := tmp(1);
-		end if;
-		
-	end loop;
+    
+    m0 := ( key(1), key(3));
+    me := ( key(0), key(2));
+    
+    for i in 0 to 1 loop
+      tmpRsRow := (
+        key(i*2)(31 downto 24),
+        key(i*2)(23 downto 16),
+        key(i*2)(15 downto 8),
+        key(i*2)(7 downto 0),
+        key(i*2+1)(31 downto 24),
+        key(i*2+1)(23 downto 16),
+        key(i*2+1)(15 downto 8),
+        key(i*2+1)(7 downto 0));
+      s(i) := rs_multiply(tmpRsRow);
+    end loop;
 
-   return whitening(cryptData, m0, me, 1);
+    -- input whitening
+    cryptData := whitening(data, m0, me, 0);
+    
+    for i in 0 to 15 loop
+      
+      cryptData := round(cryptData, i, m0, me, s);
+      tmp := ( cryptData(0), cryptData(1) );
+      
+      if i /= 16 then
+        cryptData(0) := cryptData(2);
+        cryptData(1) := cryptData(3);
+        cryptData(2) := tmp(0);
+        cryptData(3) := tmp(1);
+      end if;
+      
+    end loop;
+
+    -- output whitening
+    return whitening(cryptData, m0, me, 1);
   end function crypt;  
 
 

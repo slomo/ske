@@ -143,7 +143,7 @@ package body twofish is
   -- Multiplys vector with the constant MDS-Matrix ( given in [1] 4.2 )
   function mds( vector: vectorT) return vectorT is 
     variable i,j : integer range 1 to 4 := 1;
-    variable result : vectorT := ( others => to_unsigned(0, SBOX_WIDTH - 1) );
+    variable result : vectorT := ( others => to_unsigned(0, SBOX_WIDTH) );
 
   begin
 

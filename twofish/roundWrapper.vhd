@@ -22,7 +22,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.numeric_std.ALL;
 
 --library twofish;
-use twofish.ALL;
+use work.twofish.ALL;
 
 -- Uncomment the following library declaration if using
 -- arithmetic functions with Signed or Unsigned values
@@ -39,14 +39,10 @@ entity RoundWrapper is
         rstb : IN STD_LOGIC;
         enb : IN STD_LOGIC;
         web : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
-        addrb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
-        dinb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
-        doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
-        
-        set : IN STD_LOGIC;
-        enable : IN STD_LOGIC;
-        reset : in std_logic;
-        
+        addrb, dinb : IN STD_LOGIC_VECTOR(31 downto 0 );
+        doutb : OUT STD_LOGIC_VECTOR(31 downto 0);
+        cmds : IN STD_LOGIC_VECTOR ( 0 TO 2 );
+   
         done : OUT STD_LOGIC;
         
         clk : IN STD_LOGIC
@@ -59,14 +55,14 @@ architecture RoundWrapperArch of RoundWrapper is
     component blockram
         port (
             clka : IN STD_LOGIC;
-            wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+            wea : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
             addra : IN STD_LOGIC_VECTOR(4 DOWNTO 0);
             dina : IN STD_LOGIC_VECTOR(127 DOWNTO 0);
             douta : OUT STD_LOGIC_VECTOR(127 DOWNTO 0);
             clkb : IN STD_LOGIC;
             rstb : IN STD_LOGIC;
             enb : IN STD_LOGIC;
-            web : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+            web : IN STD_LOGIC_VECTOR(3 DOWNTO 0);
             addrb : IN STD_LOGIC_VECTOR(6 DOWNTO 0);
             dinb : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
             doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
@@ -76,16 +72,24 @@ architecture RoundWrapperArch of RoundWrapper is
     type tempT is array (0 to 3) of std_logic_vector(31 downto 0); 
     
     signal blockIn, blockOut : tempT ;
-    signal writeEnable : std_logic_vector(0 downto 0);
+    signal writeEnable : std_logic_vector(15 downto 0);
     signal adress: std_logic_vector(4 DOWNTO 0);
     signal nextAdress: std_logic_vector(4 DOWNTO 0);
-    
-    type stateT is ( idle, waitForM, waitForS, getS, ready, waitForBlock, crypt, writeBlock );
+
+    type stateT is ( idle, waitForM, waitForS, getS, ready, waitForBlock, crypt, writeBlock, waitForDisable );
     signal state : stateT := idle;
     signal nextState : stateT := idle;
     
+    signal set, enable, reset : std_logic;
+	 
+	 signal m0, me, s, nextS, nextM0, nextMe :  halfBlockT;
+	 
 begin
 
+    set <= cmds(0);
+    enable <= cmds(1);
+    reset <= cmds(2);
+	 
     mlb : blockram
         port map (
             clka => clk,
@@ -102,12 +106,12 @@ begin
             douta (127 downto 96) => blockIn(3),
             
             clkb => clkb,
-            web => web(0 downto 0),
+            web => web,
             rstb => rstb,
             enb => enb,
-            addrb => addrb(6 downto 0),
-            dinb => dinb,
-            doutb => doutb
+            addrb(6 downto 0) => addrb(8 downto 2),
+            dinb(31 downto 0) => dinb(31 downto 0),
+            doutb(31 downto 0) => doutb(31 downto 0)
             );
 
     store: process(clk, reset)
@@ -117,12 +121,18 @@ begin
         elsif clk = '1' and clk'event then
             state <= nextState;
             adress <= nextAdress;
+				me <= nextMe;
+				m0 <= nextM0;
+				s <= nextS;
         end if;
     end process;
     
-    transaction: process(state, enable, set)
+    transaction: process(state, enable, set, blockIn, m0, me, s)
     begin
         nextState <= state;
+		  nextM0 <= m0;
+		  nextMe <= me;
+		  nextS <= s;
         case state is
             when idle =>
                 if set = '1' then
@@ -132,7 +142,13 @@ begin
                 nextState <= waitForS;
             when waitForS =>
                 nextState <= getS;
+					 nextM0(0) <= unsigned(blockIn(0));
+                nextM0(1) <= unsigned(blockIn(1));
+                nextMe(0) <= unsigned(blockIn(2));
+                nextMe(1) <= unsigned(blockIn(3));
             when getS =>
+					 nextS(0) <= unsigned(blockIn(0));
+					 nextS(1) <= unsigned(blockIn(1));
                 nextState <= ready;
             when ready =>
                 if enable = '1' then
@@ -143,19 +159,19 @@ begin
             when crypt =>
                 nextState <= writeBlock;
             when writeBlock =>
-                nextState <= ready;
+                nextState <= waitForDisable;
+				when waitForDisable =>
+				   if enable = '0' then
+					     nextState <= ready;
+					end if;
         end case;        
     end process;
     
-    outlogic: process(state, blockIn)
+    outlogic: process(state, blockIn, m0, me, s)
         variable tmp : blockT;
-        -- keys
-        variable m0 : halfBlockT;
-        variable me : halfBlockT;
-        variable s : halfBlockT;
     begin
         nextAdress <= "00000";
-        writeEnable(0) <= '0';
+        writeEnable <= (others =>'0');
         done <= '0';
         blockOut <= ( others => (others => '0') );
         
@@ -165,13 +181,7 @@ begin
             when waitForM =>
                 nextAdress <= "00001";
             when waitForS =>
-                m0(0) := unsigned(blockIn(0));
-                m0(1) := unsigned(blockIn(1));
-                me(0) := unsigned(blockIn(2));
-                me(1) := unsigned(blockIn(3));
             when getS =>
-                s(0) := unsigned(blockIn(0));
-                s(1) := unsigned(blockIn(1));
             when ready =>
                 done <= '1';
             when waitForBlock =>
@@ -187,10 +197,12 @@ begin
                     std_logic_vector(tmp(1)),
                     std_logic_vector(tmp(2)),
                     std_logic_vector(tmp(3)) );
-                writeEnable(0) <= '1';
+                writeEnable <= ( others => '1');
             when writeBlock =>
-                writeEnable(0) <= '0';
+				when waitForDisable =>
+					 done <= '1';
         end case;
+
     end process;
 
 end RoundWrapperArch;
